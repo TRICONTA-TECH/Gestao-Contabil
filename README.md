@@ -3,7 +3,7 @@
 Esse repositório é dedicado para documentar códigos de automação produzidos para a empresa Gestão Contábil.
 
 ## 1. Documentação
-A documentação do repositório pode ser lida no <a href="">link</a>.
+A documentação do repositório pode ser lida localmente.
 
 ## 2. Padrão de Commit
 O padrão seguido para os commits nesse repositório seguem o template:
@@ -43,3 +43,11 @@ Caminhe até a pasta do repositório da empresa com o comando:
 Instale as dependências rodando no terminal:
 
 `pip install -r requirements.txt`
+
+#### 4.3 Rode a documentação
+
+No terminal, digite o comando:
+
+`mkdocs serve`
+
+Clique no link gerado no terminal pressionando a tecla `ctrl` do teclado.
