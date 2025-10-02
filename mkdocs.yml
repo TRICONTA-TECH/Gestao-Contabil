@@ -4,6 +4,7 @@ site_description: Documentação das automações feitas para Gestão Contábil
 nav:
   - Início: index.md
   - Tabelas Dinâmicas: tabelas-dinamicas.md
+  - Relatórios: relatorios.md
 
 markdown_extensions:
   - admonition

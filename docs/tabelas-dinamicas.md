@@ -3,7 +3,7 @@
 ## 1. Introdução
 
 <div style="text-align: justify; text-indent: 2cm;">
-Esse código foi produzido em Python, utilizando a biblioteca Pandas. Tem como objetivo deixar mais rápida a geração de tabelas dinâmicas. A planilha gerada permite uma visão mais clara e limpa da quantidade de competências abertas/concluídas por responsável e seu respectivo cliente. 
+Esse código foi produzido em <b>Python</b>, utilizando a biblioteca <a href="https://pandas.pydata.org/"><b>Pandas</b></a>. Tem como objetivo deixar mais rápida a geração de tabelas dinâmicas. A planilha gerada permite uma visão mais clara e limpa da quantidade de competências abertas/concluídas por responsável e seu respectivo cliente. 
 </div>
 
 ## 2. Arquivos Necessários

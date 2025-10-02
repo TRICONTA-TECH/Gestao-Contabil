@@ -14,6 +14,7 @@ Os principais requisitos explorados foram:
 
 <ul style="text-align: justify; padding-left: 4em; margin-top: 0.5em;">
 <li>Automação de Geração de Tabelas Dinâmicas;
+<li>Geração de Relatórios para Análise de colaboradores de Contabilidade da empresa;
 </ul>
 
 ## 3. Histórico de Versões
@@ -21,3 +22,4 @@ Os principais requisitos explorados foram:
 | Versão |Descrição     |Autor                                       |Data |    
 |:-:     | :-:          | :-:                                        | :-:        |
 |1.0     |Criação do documento|[Mayara Marques](https://github.com/maymarquee)| 01/10/2025 | 
+|1.1     |Adiciona requisito|[Mayara Marques](https://github.com/maymarquee)| 02/10/2025 | 
