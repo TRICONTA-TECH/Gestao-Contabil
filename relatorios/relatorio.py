@@ -31,7 +31,7 @@ else:
 
 # Exibe tabela
 st.write("### Visão Geral por Responsável")
-st.dataframe(relatorio)
+st.dataframe(relatorio.round(2))
 
 # Gráfico de barras com Status ABERTO, CONCLUIDO e IMPEDIMENTO
 st.write("### Gráfico da Análise Geral")
@@ -41,7 +41,7 @@ st.bar_chart(relatorio.set_index("Responsável")[status_cols])
 # Percentual concluído
 st.write("### Percentual dos Responsáveis: Competências Concluídas")
 
-st.dataframe(relatorio[["Responsável", "% Concluído"]])
+st.dataframe(relatorio[["Responsável", "% Concluído"]].round(2))
 
 # Criar gráfico de barras para % concluído
 grafico_percentual = (
@@ -94,4 +94,5 @@ st.altair_chart(grafico, use_container_width=True)
 
 
 # # SUGESTÕES
+# AJEITAR PORCENTAGEM DE ENTREGA POR SEMANA - RESPONSÁVEL E GERAL
 # # Sugerir criar relatórios desenvolvidos por IA de acordo com os gráficos -> teria que pagar a IA
