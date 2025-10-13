@@ -27,7 +27,7 @@ etapas_dlf = {
 
 etapa_para_pct = {v[0]: v[1] for v in etapas_dlf.values()}
 
-df_original = pd.read_excel("gestta.busca (5).xlsx")
+df_original = pd.read_excel("gestta.busca (6).xlsx")
 if not df_original.empty:
     df = df_original.copy()
 
@@ -83,20 +83,26 @@ if not df_original.empty:
         else 0
     )
 
+    # Tratar 'DESCONSIDERADO' também como concluído para esta análise
     df_responsavel = df.groupby("Responsável").agg(
         
-        Tarefas_Concluidas=('Status', lambda x: (x.str.upper() == 'CONCLUIDO').sum()),
+        Tarefas_Concluidas=('Status', lambda x: x.astype(str).str.strip().str.upper().isin(['CONCLUIDO', 'DESCONSIDERADO']).sum()),
         
         Total_Tarefas=('Status', 'size')
         
     ).reset_index()
 
 
-    abertas_dlf = df_outros[df_outros["Status"].str.upper() != "CONCLUIDO"]
-    abertas_parc = df_parcelamentos[df_parcelamentos["Status"].str.upper() != "CONCLUIDO"]
+    # Considerar apenas Status == 'ABERTO' como tarefas em aberto (case-insensitive)
+    abertas_dlf = df_outros[df_outros["Status"].astype(str).str.strip().str.upper() == "ABERTO"].copy()
+    abertas_parc = df_parcelamentos[df_parcelamentos["Status"].astype(str).str.strip().str.upper() == "ABERTO"].copy()
 
-    contagem_abertas_dlf = abertas_dlf["Responsável"].value_counts()
-    contagem_abertas_parc = abertas_parc["Responsável"].value_counts()
+    # Contar clientes únicos por responsável entre as tarefas em aberto (Cliente + CNPJ/CPF)
+    abertas_dlf['Cliente_Unico'] = abertas_dlf['Cliente'].astype(str).str.strip() + '_' + abertas_dlf['CNPJ/CPF'].astype(str).str.strip()
+    abertas_parc['Cliente_Unico'] = abertas_parc['Cliente'].astype(str).str.strip() + '_' + abertas_parc['CNPJ/CPF'].astype(str).str.strip()
+
+    contagem_abertas_dlf = abertas_dlf.drop_duplicates(subset=['Cliente_Unico', 'Responsável']).groupby('Responsável')['Cliente_Unico'].nunique()
+    contagem_abertas_parc = abertas_parc.drop_duplicates(subset=['Cliente_Unico', 'Responsável']).groupby('Responsável')['Cliente_Unico'].nunique()
 
     df_tarefas_abertas = (
         contagem_abertas_dlf.add(contagem_abertas_parc, fill_value=0)
@@ -175,17 +181,58 @@ if not df_original.empty:
 
     st.write("---")
     st.write("## Andamentos de Cliente por Etapas")
-    st.markdown("Considera a porcentagem de progresso dos DLFs por cliente.")
+    st.markdown("Considera a porcentagem de progresso dos DLFs por cliente. Se um cliente possui filiais (mesmo nome, CNPJ/CPF diferentes), a média entre filiais é exibida.")
+
+    # Preparar identificadores limpos
+    df_outros['Cliente_clean'] = df_outros['Cliente'].astype(str).str.strip()
+    df_outros['CNPJ_clean'] = df_outros['CNPJ/CPF'].astype(str).str.strip()
+    df_outros['Cliente_Branch'] = df_outros['Cliente_clean'] + '_' + df_outros['CNPJ_clean']
+
+    etapa_ordem = {
+        "DLF 1ª - Recebimento de Informações Fiscais": 1,
+        "DLF 2ª - Escrituração e apuração": 2,
+        "DLF 3ª - Revisão E Conferência": 3,
+        "DLF 4ª - Envio Dos Impostos": 4
+    }
+    etapa_pct = {
+        "DLF 1ª - Recebimento de Informações Fiscais": 25.0,
+        "DLF 2ª - Escrituração e apuração": 50.0,
+        "DLF 3ª - Revisão E Conferência": 75.0,
+        "DLF 4ª - Envio Dos Impostos": 100.0
+    }
+
+    # Calcular progresso por filial (Cliente_Branch)
+    def calcular_progresso_filial(g):
+        etapas = g['Etapa DLF'].dropna().unique().tolist()
+        # Se houver DLF 4, considera 100%
+        if any(e == "DLF 4ª - Envio Dos Impostos" for e in etapas):
+            return 100.0
+        # Escolher a etapa de maior ordem conhecida
+        melhor = None
+        melhor_ordem = 0
+        for e in etapas:
+            if e in etapa_ordem and etapa_ordem[e] > melhor_ordem:
+                melhor_ordem = etapa_ordem[e]
+                melhor = e
+        if melhor:
+            return etapa_pct.get(melhor, 0.0)
+        return 0.0
+
+    df_branch = (
+        df_outros.groupby('Cliente_Branch').apply(calcular_progresso_filial).reset_index(name='Progresso_Branch')
+    )
+    # Extrair nome do cliente (antes do underscore) para agregar filiais
+    # Extrair o nome do cliente de forma segura (separa na última ocorrência do underscore)
+    df_branch['Cliente'] = df_branch['Cliente_Branch'].apply(lambda x: x.rsplit('_', 1)[0])
+
+    # Média de progresso entre filiais por cliente
     df_progresso_cliente = (
-         df_outros.groupby("Cliente")["Progresso Final (%)"]
-        .mean()
-        .reset_index()
-     )
+        df_branch.groupby('Cliente')['Progresso_Branch'].mean().reset_index()
+    )
+    df_progresso_cliente.rename(columns={'Progresso_Branch': 'Progresso (%)'}, inplace=True)
+    df_progresso_cliente['Progresso (%)'] = df_progresso_cliente['Progresso (%)'].round(2)
 
-    df_progresso_cliente.rename(columns={"Progresso Final (%)": "Progresso (%)"}, inplace=True)
-
-    st.dataframe(df_progresso_cliente.sort_values(by="Progresso (%)", ascending=False), use_container_width=True)
-
+    st.dataframe(df_progresso_cliente.sort_values(by='Progresso (%)', ascending=False), use_container_width=True)
 
     st.write("### Quantidade de DLFs por Etapa (Visão Geral)")
    
@@ -400,26 +447,33 @@ df_outros_mes = df_outros[
     (df_outros["Data de Conclusão"] <= fim_mes)
 ].copy()
 
+if 'Cliente_Unico' not in df_outros_mes.columns:
+    df_outros_mes['Cliente_Unico'] = df_outros_mes['Cliente'].astype(str).str.strip() + '_' + df_outros_mes['CNPJ/CPF'].astype(str).str.strip()
 
 dias = pd.date_range(inicio_mes, fim_mes, freq="D")
 
 dados_por_dia = []
 
+unique_outros = df_outros['Cliente'].astype(str).str.strip() + '_' + df_outros['CNPJ/CPF'].astype(str).str.strip()
+unique_parc = df_parcelamentos['Cliente'].astype(str).str.strip() + '_' + df_parcelamentos['CNPJ/CPF'].astype(str).str.strip()
+# pd.Series.append is removed in recent pandas; usar pd.concat para unir
+total_setor = pd.Index(pd.concat([unique_outros, unique_parc], ignore_index=True)).nunique()
+
 for dia in dias:
-    df_dia = df_outros_mes[df_outros_mes["Data de Conclusão"] <= dia]
-    clientes_dia = df_dia["Cliente"].unique()
-    total_clientes_dia = len(clientes_dia)
+    df_ate_dia = df_outros_mes[
+        (df_outros_mes['Data de Conclusão'].dt.date <= dia.date()) &
+        (df_outros_mes['Etapa DLF'] == 'DLF 4ª - Envio Dos Impostos') &
+        (df_outros_mes['Status'].astype(str).str.strip().str.upper() == 'CONCLUIDO')
+    ]
+    concluidos_unicos = df_ate_dia['Cliente_Unico'].dropna().unique()
+    cumul_count = len(concluidos_unicos)
 
-    clientes_etapa4_dia = df_dia.loc[
-        df_dia["Etapa DLF"] == "DLF 4ª - Envio Dos Impostos", "Cliente"
-    ].unique()
-    total_etapa4_dia = len(clientes_etapa4_dia)
-
-    percentual_dia = (total_etapa4_dia / total_clientes_dia * 100) if total_clientes_dia > 0 else 0
+    percentual_acumulado = (cumul_count / total_setor * 100) if total_setor > 0 else 0
 
     dados_por_dia.append({
-        "Data": dia.date(),
-        "Percentual Etapa 4 (%)": percentual_dia
+        'Data': dia.date(),
+        'Percentual Dia (%)': None,
+        'Percentual Acumulado (%)': percentual_acumulado
     })
 
 df_evolucao = pd.DataFrame(dados_por_dia)
@@ -431,20 +485,20 @@ try:
 except locale.Error:
     print("Local 'pt_BR.UTF-8' não encontrado. Usando o local padrão.")
 
-
-df_evolucao = pd.DataFrame(dados_por_dia)
-
 df_evolucao["Data Formatada"] = pd.to_datetime(df_evolucao["Data"]).dt.strftime('%d de %b')
+df_evolucao['Percentual Dia (%)'] = df_evolucao['Percentual Dia (%)'].astype(float)
+df_evolucao['Percentual Acumulado (%)'] = df_evolucao['Percentual Acumulado (%)'].astype(float)
+df_evolucao['Percentual_Acumulado'] = df_evolucao['Percentual Acumulado (%)']
 
 grafico_evolucao = (
     alt.Chart(df_evolucao)
     .mark_line(point=True, strokeWidth=2, color="#1f77b4")
     .encode(
         x=alt.X("Data Formatada:O", title="Data", sort=df_evolucao["Data Formatada"].tolist()),
-        y=alt.Y("Percentual Etapa 4 (%):Q", title="Percentual de Clientes na Etapa 4"),
-        tooltip=["Data Formatada", alt.Tooltip("Percentual Etapa 4 (%):Q", format=".2f")]
+        y=alt.Y("Percentual_Acumulado:Q", title="Percentual Acumulado do Setor (%)", axis=alt.Axis(format=".2f")),
+        tooltip=["Data Formatada", alt.Tooltip("Percentual_Acumulado:Q", format=".3f")]
     )
-    .properties(title="Evolução Diária - Clientes na Etapa DLF 4 no mês")
+    .properties(title="Evolução Acumulada - Clientes na Etapa DLF 4 no mês")
 )
 
 st.altair_chart(grafico_evolucao, use_container_width=True)
