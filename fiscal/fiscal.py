@@ -27,7 +27,7 @@ etapas_dlf = {
 
 etapa_para_pct = {v[0]: v[1] for v in etapas_dlf.values()}
 
-df_original = pd.read_excel("gestta.busca (4).xlsx")
+df_original = pd.read_excel("gestta.busca (5).xlsx")
 if not df_original.empty:
     df = df_original.copy()
 
@@ -51,10 +51,13 @@ if not df_original.empty:
 
     df_outros["Progresso Final (%)"] = df_outros["Progresso_Etapa"]
 
-    status_contagem_parc = df_parcelamentos["Status"].value_counts().reset_index()
-    status_contagem_parc.columns = ["Status", "Quantidade"]
+
+    df_parcelamentos['Status_norm'] = df_parcelamentos['Status'].astype(str).str.strip().str.upper()
+    status_contagem_parc = df_parcelamentos['Status_norm'].value_counts().reset_index()
+    status_contagem_parc.columns = ['Status', 'Quantidade']
+
     parc_concluidos = status_contagem_parc.loc[
-        status_contagem_parc["Status"] == "CONCLUIDO", "Quantidade"
+        status_contagem_parc['Status'].isin(['CONCLUIDO', 'DESCONSIDERADO']), 'Quantidade'
     ].sum()
 
     total_tarefas_dlf = len(df_outros)
