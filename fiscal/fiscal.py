@@ -6,7 +6,24 @@ import datetime as dt
 import locale
 
 st.set_page_config(page_title="Setor Fiscal", layout="wide")
-st.write("# Relatório Setor Fiscal - Outubro de 2025")
+
+# obtem mês e ano atual
+data_atual = dt.datetime.now()
+mes_nome = data_atual.strftime("%B de %Y")
+
+# localiza para português se disponível
+try:
+    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+    mes_nome = data_atual.strftime("%B de %Y")
+except locale.Error:
+    meses_pt = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+    }
+    mes_nome = f"{meses_pt[data_atual.month]} de {data_atual.year}"
+
+st.write(f"# Relatório Setor Fiscal - {mes_nome}")
 
 def normalizar_texto(texto):
     if pd.isna(texto):
@@ -27,7 +44,13 @@ etapas_dlf = {
 
 etapa_para_pct = {v[0]: v[1] for v in etapas_dlf.values()}
 
-df_original = pd.read_excel("gestta.busca (6).xlsx")
+uploaded_file = st.file_uploader("Envie a planilha Excel (gestta.busca).", type=["xlsx", "xls"])
+
+if uploaded_file is None:
+    st.info("Por favor, carregue a planilha para gerar o relatório.")
+    st.stop()
+
+df_original = pd.read_excel(uploaded_file)
 if not df_original.empty:
     df = df_original.copy()
 
@@ -83,7 +106,7 @@ if not df_original.empty:
         else 0
     )
 
-    # Tratar 'DESCONSIDERADO' também como concluído para esta análise
+    # trata 'DESCONSIDERADO' também como concluído para esta análise
     df_responsavel = df.groupby("Responsável").agg(
         
         Tarefas_Concluidas=('Status', lambda x: x.astype(str).str.strip().str.upper().isin(['CONCLUIDO', 'DESCONSIDERADO']).sum()),
@@ -93,11 +116,11 @@ if not df_original.empty:
     ).reset_index()
 
 
-    # Considerar apenas Status == 'ABERTO' como tarefas em aberto (case-insensitive)
+    # considera apenas Status == 'ABERTO' como tarefas em aberto (case-insensitive)
     abertas_dlf = df_outros[df_outros["Status"].astype(str).str.strip().str.upper() == "ABERTO"].copy()
     abertas_parc = df_parcelamentos[df_parcelamentos["Status"].astype(str).str.strip().str.upper() == "ABERTO"].copy()
 
-    # Contar clientes únicos por responsável entre as tarefas em aberto (Cliente + CNPJ/CPF)
+    # conta clientes únicos por responsável entre as tarefas em aberto (Cliente + CNPJ/CPF)
     abertas_dlf['Cliente_Unico'] = abertas_dlf['Cliente'].astype(str).str.strip() + '_' + abertas_dlf['CNPJ/CPF'].astype(str).str.strip()
     abertas_parc['Cliente_Unico'] = abertas_parc['Cliente'].astype(str).str.strip() + '_' + abertas_parc['CNPJ/CPF'].astype(str).str.strip()
 
@@ -183,7 +206,7 @@ if not df_original.empty:
     st.write("## Andamentos de Cliente por Etapas")
     st.markdown("Considera a porcentagem de progresso dos DLFs por cliente. Se um cliente possui filiais (mesmo nome, CNPJ/CPF diferentes), a média entre filiais é exibida.")
 
-    # Preparar identificadores limpos
+
     df_outros['Cliente_clean'] = df_outros['Cliente'].astype(str).str.strip()
     df_outros['CNPJ_clean'] = df_outros['CNPJ/CPF'].astype(str).str.strip()
     df_outros['Cliente_Branch'] = df_outros['Cliente_clean'] + '_' + df_outros['CNPJ_clean']
@@ -201,13 +224,13 @@ if not df_original.empty:
         "DLF 4ª - Envio Dos Impostos": 100.0
     }
 
-    # Calcular progresso por filial (Cliente_Branch)
+    # calcula progresso por filial (Cliente_Branch)
     def calcular_progresso_filial(g):
         etapas = g['Etapa DLF'].dropna().unique().tolist()
-        # Se houver DLF 4, considera 100%
+        # se houver DLF 4, considera 100%
         if any(e == "DLF 4ª - Envio Dos Impostos" for e in etapas):
             return 100.0
-        # Escolher a etapa de maior ordem conhecida
+        # escolhe a etapa de maior ordem conhecida
         melhor = None
         melhor_ordem = 0
         for e in etapas:
@@ -221,11 +244,11 @@ if not df_original.empty:
     df_branch = (
         df_outros.groupby('Cliente_Branch').apply(calcular_progresso_filial).reset_index(name='Progresso_Branch')
     )
-    # Extrair nome do cliente (antes do underscore) para agregar filiais
-    # Extrair o nome do cliente de forma segura (separa na última ocorrência do underscore)
+    # extrai nome do cliente (antes do underscore) para agregar filiais
+    # extrai o nome do cliente de forma segura (separa na última ocorrência do underscore)
     df_branch['Cliente'] = df_branch['Cliente_Branch'].apply(lambda x: x.rsplit('_', 1)[0])
 
-    # Média de progresso entre filiais por cliente
+    # média de progresso entre filiais por cliente
     df_progresso_cliente = (
         df_branch.groupby('Cliente')['Progresso_Branch'].mean().reset_index()
     )
@@ -439,8 +462,14 @@ df_etapa4_chart = pd.DataFrame({
 
 df_outros["Data de Conclusão"] = pd.to_datetime(df_outros["Data de Conclusão"], errors="coerce")
 
-inicio_mes = dt.datetime(2025, 10, 1)
-fim_mes = dt.datetime(2025, 10, 31)
+
+data_atual = dt.datetime.now()
+inicio_mes = dt.datetime(data_atual.year, data_atual.month, 1)
+
+if data_atual.month == 12:
+    fim_mes = dt.datetime(data_atual.year + 1, 1, 1) - dt.timedelta(days=1)
+else:
+    fim_mes = dt.datetime(data_atual.year, data_atual.month + 1, 1) - dt.timedelta(days=1)
 
 df_outros_mes = df_outros[
     (df_outros["Data de Conclusão"] >= inicio_mes) & 
@@ -456,7 +485,6 @@ dados_por_dia = []
 
 unique_outros = df_outros['Cliente'].astype(str).str.strip() + '_' + df_outros['CNPJ/CPF'].astype(str).str.strip()
 unique_parc = df_parcelamentos['Cliente'].astype(str).str.strip() + '_' + df_parcelamentos['CNPJ/CPF'].astype(str).str.strip()
-# pd.Series.append is removed in recent pandas; usar pd.concat para unir
 total_setor = pd.Index(pd.concat([unique_outros, unique_parc], ignore_index=True)).nunique()
 
 for dia in dias:
@@ -478,7 +506,7 @@ for dia in dias:
 
 df_evolucao = pd.DataFrame(dados_por_dia)
 
-st.write("### Evolução Diária dos Clientes na Etapa 4 (Outubro/2025)")
+st.write(f"### Evolução Diária dos Clientes na Etapa 4 ({mes_nome})")
 
 try:
     locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
