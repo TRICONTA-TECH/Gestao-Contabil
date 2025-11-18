@@ -18,25 +18,21 @@ Esse código foi produzido em <b>Python</b>, utilizando o framework <a href="htt
 
 ## 2. Arquivos Necessários
 <div style="text-align: justify; text-indent: 2cm;">
-Os arquivos necessários para o código são:
+Os arquivos necessários para a geração do relatório são:
 </div>
 
 <ul style="text-align: justify; padding-left: 4em; margin-top: 0.5em;">
 <li> Planilha Excel (.xlsx) filtrada pelo setor fiscal gerada a partir do sistema <b>Gestta</b>. 
 </ul>
 
-## 3. Passos Necessários
-<ul style="text-align: justify; padding-left: 4em; margin-top: 0.5em;">
-<li> Colocar o arquivo.xlsx no mesmo diretório da pasta do código Python (pasta fiscal)
-<li> Alterar o nome da planilha na importação, se necessário, na <b> linha 30</b>
-<li> Rodar o Streamlit com o comando 
-        <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px;">
-            python -m streamlit run fiscal.py
-        </code>
-</ul>
+## 3. Deploy
+<div style="text-align: justify; text-indent: 2cm;">
+O deploy do relatório foi realizado pelo Streamlit e pode ser acessado pelo link: <a href="https://gestao-contabil-fiscal.streamlit.app/">https://gestao-contabil-fiscal.streamlit.app/</a>.
+</div>
 
 ## 4. Histórico de Versão
 
 | Versão |Descrição     |Autor                                       |Data |    
 |:-:     | :-:          | :-:                                        | :-:        |
 |1.0     |Criação do documento|[Mayara Marques](https://github.com/maymarquee)| 13/10/2025 | 
+|1.1     |Adiciona documentação do deploy|[Mayara Marques](https://github.com/maymarquee)| 18/11/2025 | 
