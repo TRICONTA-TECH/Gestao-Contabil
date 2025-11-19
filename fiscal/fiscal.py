@@ -322,7 +322,96 @@ if not df_original.empty:
     df_pivot["Total"] = df_pivot.sum(axis=1)
     st.dataframe(df_pivot.sort_values(by="Total", ascending=False), use_container_width=True)
 
-    # Análise de Conclusão
+    # conta tarefas DLF únicas
+    df_dlf = df[df["Nome"].str.contains("dlf", case=False, na=False)]
+
+    def contar_tarefas_dlf_unicas(df_original: pd.DataFrame):
+        df_temp = df_original.copy()
+        df_temp.columns = df_temp.columns.str.strip()
+        if "Nome" not in df_temp.columns or "Cliente" not in df_temp.columns:
+            raise ValueError("O DataFrame precisa ter as colunas 'Nome' e 'Cliente'.")
+
+        df_temp["Nome_norm"] = df_temp["Nome"].astype(str).apply(normalizar_texto)
+
+        def identificar_etapa(nome_norm):
+            for chave, (etapa_completa, pct) in etapas_dlf.items():
+                if chave in nome_norm:
+                    return etapa_completa
+            return None
+
+        df_temp["Etapa DLF"] = df_temp["Nome_norm"].apply(identificar_etapa)
+
+        df_outros_temp = df_temp[~df_temp["Nome_norm"].str.contains("parcelamento", na=False)].copy()
+
+        df_outros_temp["Cliente"] = df_outros_temp["Cliente"].astype(str).str.strip()
+
+        contagem_por_etapa = df_outros_temp["Etapa DLF"].value_counts().reindex([v[0] for v in etapas_dlf.values()], fill_value=0)
+        
+        total_clientes_dlf = contagem_por_etapa["DLF 1ª - Recebimento de Informações Fiscais"]
+
+        clientes_etapa4 = df_outros_temp.loc[
+            df_outros_temp["Etapa DLF"] == "DLF 4ª - Envio Dos Impostos", "Cliente"
+        ].dropna().unique()
+        total_clientes_etapa4 = len(clientes_etapa4)
+
+        percentual_etapa4 = (total_clientes_etapa4 / total_clientes_dlf * 100) if total_clientes_dlf > 0 else 0.0
+
+        return {
+            "total_clientes_dlf": int(total_clientes_dlf),
+            "contagem_por_etapa": contagem_por_etapa,
+            "total_clientes_etapa4": int(total_clientes_etapa4),
+            "percentual_etapa4": float(percentual_etapa4),
+            "df_outros": df_outros_temp
+        }
+
+    resultado = contar_tarefas_dlf_unicas(df_original)
+
+    total_clientes_dlf = resultado["total_clientes_dlf"] 
+    total_clientes_etapa4 = resultado["total_clientes_etapa4"]
+    percentual_etapa4 = resultado["percentual_etapa4"]
+
+    st.write("---")
+    st.write("## Análise de Conclusão por Cliente")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total de Clientes com DLF", total_clientes_dlf)
+    col2.metric("Clientes na Etapa de Envio dos Impostos", total_clientes_etapa4)
+    col3.metric("Percentual do Setor no Envio Dos Impostos", f"{percentual_etapa4:.2f}%")
+
+    # gráfico de progresso
+    df_progresso = pd.DataFrame([
+        {"categoria": "Progresso", "percentual": percentual_etapa4, "tipo": "Atual"},
+        {"categoria": "Progresso", "percentual": 100 - percentual_etapa4, "tipo": "Restante"}
+    ])
+
+    grafico_progresso = alt.Chart(df_progresso).mark_bar().encode(
+        y=alt.Y('categoria:N', title=None, axis=None),
+        x=alt.X('percentual:Q', title='Percentual de Conclusão (%)'),
+        color=alt.Color('tipo:N', 
+                       scale=alt.Scale(domain=['Atual', 'Restante'],
+                                     range=['#1f77b4', '#e1e1e1']),
+                       legend=None)
+    ).properties(
+        title='Progresso do Setor na Etapa de Envio Dos Impostos',
+        height=100
+    )
+
+    texto_percentual = alt.Chart(pd.DataFrame([{
+        'categoria': 'Progresso',
+        'percentual': percentual_etapa4/2,
+        'text': f'{percentual_etapa4:.1f}%'
+    }])).mark_text(
+        color='white',
+        fontSize=14,
+        fontWeight='bold'
+    ).encode(
+        y='categoria:N',
+        x='percentual:Q',
+        text='text:N'
+    )
+
+    st.altair_chart(grafico_progresso + texto_percentual, use_container_width=True)
+
+    # análise de conclusão - evolução
     df_outros["Data de Conclusão"] = pd.to_datetime(df_outros["Data de Conclusão"], errors="coerce")
 
     # Usar mês e ano atual
