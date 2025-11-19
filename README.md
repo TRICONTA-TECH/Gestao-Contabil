@@ -3,7 +3,7 @@
 Esse repositório é dedicado para documentar códigos de automação produzidos para a empresa Gestão Contábil.
 
 ## 1. Documentação
-A documentação do repositório pode ser lida localmente.
+A documentação do repositório pode ser lida no [link](https://triconta-tech.github.io/Gestao-Contabil/).
 
 ## 2. Padrão de Commit
 O padrão seguido para os commits nesse repositório seguem o template:
