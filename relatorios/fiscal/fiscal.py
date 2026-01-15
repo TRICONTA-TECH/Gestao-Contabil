@@ -263,8 +263,11 @@ if not df_original.empty:
     if 'Cliente_Unico' not in df_outros.columns:
         df_outros['Cliente_Unico'] = df_outros['Cliente'].astype(str).str.strip() + '_' + df_outros['CNPJ/CPF'].astype(str).str.strip()
 
+    # filtra apenas tarefas ABERTAS para visualização atual do setor
+    df_outros_viz = df_outros[df_outros["Status"].astype(str).str.strip().str.upper() == "ABERTO"].copy()
+
     df_etapa_maxima = (
-        df_outros.groupby('Cliente_Unico')
+        df_outros_viz.groupby('Cliente_Unico')
         .agg({
             'Etapa DLF': lambda x: max(x, key=lambda y: etapas_principais.index(y) if y in etapas_principais else -1)
         })
@@ -294,13 +297,18 @@ if not df_original.empty:
     st.altair_chart(grafico_etapas, use_container_width=True)
 
     st.write("### Quantidade de DLFs por Responsável e Etapa")
+    df_outros_abertas = df_outros[df_outros["Status"].astype(str).str.strip().str.upper() == "ABERTO"].copy()
 
-    df_dlf_responsavel = df_outros.groupby(["Responsável", "Etapa DLF"]).size().reset_index(name="Quantidade")
-
-    df_dlf_responsavel = df_dlf_responsavel[df_dlf_responsavel["Etapa DLF"].isin(etapas_principais)]
+    df_dlf_responsavel = (
+        df_outros_abertas
+        .loc[df_outros_abertas["Etapa DLF"].isin(etapas_principais)]
+        .groupby(["Responsável", "Etapa DLF"]) 
+        .size()
+        .reset_index(name="Quantidade")
+    )
 
     grafico_dlf_responsavel = alt.Chart(df_dlf_responsavel).mark_bar().encode(
-        x=alt.X("Quantidade:Q", title="Quantidade de DLFs"),
+        x=alt.X("Quantidade:Q", title="Quantidade de DLFs (ABERTO)"),
         y=alt.Y("Responsável:N", title="Responsável"),
         color=alt.Color("Etapa DLF:N", 
                        title="Etapa",
@@ -308,7 +316,7 @@ if not df_original.empty:
                        sort=etapas_principais),
         tooltip=["Responsável", "Etapa DLF", "Quantidade"]
     ).properties(
-        title="Distribuição de DLFs por Responsável e Etapa",
+        title="Distribuição de DLFs Abertos por Responsável e Etapa",
         height=400
     )
 
@@ -344,21 +352,22 @@ if not df_original.empty:
         df_outros_temp = df_temp[~df_temp["Nome_norm"].str.contains("parcelamento", na=False)].copy()
 
         df_outros_temp["Cliente"] = df_outros_temp["Cliente"].astype(str).str.strip()
+        df_outros_temp["CNPJ_clean"] = df_outros_temp["CNPJ/CPF"].astype(str).str.strip()
+        df_outros_temp["Cliente_Unico"] = df_outros_temp["Cliente"] + "_" + df_outros_temp["CNPJ_clean"]
 
-        contagem_por_etapa = df_outros_temp["Etapa DLF"].value_counts().reindex([v[0] for v in etapas_dlf.values()], fill_value=0)
-        
-        total_clientes_dlf = contagem_por_etapa["DLF 1ª - Recebimento de Informações Fiscais"]
+        # conta clientes ÚNICOS com qualquer Etapa DLF (não apenas contagem de tarefas)
+        total_clientes_dlf = df_outros_temp[df_outros_temp["Etapa DLF"].notna()]["Cliente_Unico"].nunique()
 
-        clientes_etapa4 = df_outros_temp.loc[
-            df_outros_temp["Etapa DLF"] == "DLF 4ª - Envio Dos Impostos", "Cliente"
-        ].dropna().unique()
-        total_clientes_etapa4 = len(clientes_etapa4)
+        # conta clientes ÚNICOS na etapa 4 (mesmo que apareçam em múltiplas linhas)
+        df_etapa4 = df_outros_temp.loc[
+            df_outros_temp["Etapa DLF"] == "DLF 4ª - Envio Dos Impostos"
+        ].copy()
+        total_clientes_etapa4 = df_etapa4["Cliente_Unico"].nunique()
 
         percentual_etapa4 = (total_clientes_etapa4 / total_clientes_dlf * 100) if total_clientes_dlf > 0 else 0.0
 
         return {
             "total_clientes_dlf": int(total_clientes_dlf),
-            "contagem_por_etapa": contagem_por_etapa,
             "total_clientes_etapa4": int(total_clientes_etapa4),
             "percentual_etapa4": float(percentual_etapa4),
             "df_outros": df_outros_temp
@@ -414,7 +423,7 @@ if not df_original.empty:
     # análise de conclusão - evolução
     df_outros["Data de Conclusão"] = pd.to_datetime(df_outros["Data de Conclusão"], errors="coerce")
 
-    # Usar mês e ano atual
+    # usa mês e ano atual
     inicio_mes = dt.datetime(data_atual.year, data_atual.month, 1)
     if data_atual.month == 12:
         fim_mes = dt.datetime(data_atual.year + 1, 1, 1) - dt.timedelta(days=1)
@@ -441,7 +450,7 @@ if not df_original.empty:
         df_ate_dia = df_outros_mes[
             (df_outros_mes['Data de Conclusão'].dt.date <= dia.date()) &
             (df_outros_mes['Etapa DLF'] == 'DLF 4ª - Envio Dos Impostos') &
-            (df_outros_mes['Status'].astype(str).str.strip().str.upper() == 'CONCLUIDO')
+            (df_outros_mes['Status'].astype(str).str.strip().str.upper().isin(['CONCLUIDO', 'DESCONSIDERADO']))
         ]
         concluidos_unicos = df_ate_dia['Cliente_Unico'].dropna().unique()
         cumul_count = len(concluidos_unicos)
@@ -483,7 +492,7 @@ if not df_original.empty:
 
     df_dlf4 = df[
         (df["Nome"].str.strip().str.upper() == "DLF 4ª - ENVIO DOS IMPOSTOS") &
-        (df["Status"].str.strip().str.upper() == "CONCLUIDO")
+        (df["Status"].astype(str).str.strip().str.upper().isin(["CONCLUIDO", "DESCONSIDERADO"]))
     ].copy()
 
     df_dlf4 = df_dlf4.dropna(subset=["Data de Conclusão"])
